@@ -1,0 +1,35 @@
+// Prisma schema for optional PostgreSQL backing store.
+// The application must still operate without a database.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Friend {
+  id        String   @id @default(uuid())
+  name      String
+  email     String?
+  createdAt DateTime @default(now())
+  debtsAsCreditor Debt[] @relation("Creditor")
+  debtsAsDebtor  Debt[] @relation("Debtor")
+}
+
+model Debt {
+  id          String   @id @default(uuid())
+  amount      Float
+  name        String?
+  isPaid      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  paidAt      DateTime?
+  isDivided   Boolean  @default(false)
+  dividedAmong String[]
+  creditor    Friend   @relation("Creditor", fields: [creditorId], references: [id])
+  creditorId  String
+  debtor      Friend   @relation("Debtor", fields: [debtorId], references: [id])
+  debtorId    String
+}
