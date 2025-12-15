@@ -1,10 +1,10 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataContext } from '@/components/data-context';
 
-export default function AddDebtPage() {
+function AddDebtForm() {
   const search = useSearchParams();
   const router = useRouter();
   const { data, addDebt } = useDataContext();
@@ -164,5 +164,21 @@ export default function AddDebtPage() {
         </div>
       </form>
     </main>
+  );
+}
+
+function LoadingForm() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
+      <div className="rounded-lg bg-white px-4 py-3 text-slate-700 shadow">Loading form...</div>
+    </main>
+  );
+}
+
+export default function AddDebtPage() {
+  return (
+    <Suspense fallback={<LoadingForm />}>
+      <AddDebtForm />
+    </Suspense>
   );
 }
