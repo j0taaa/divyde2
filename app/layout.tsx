@@ -1,10 +1,7 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
 import { DataProvider } from '@/components/data-context';
 import { ServiceWorkerRegistrar } from '@/components/service-worker';
-
-const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Debt Tracker',
@@ -19,7 +16,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${inter.className} bg-slate-50 text-slate-900`}>
+      <body className="bg-slate-50 text-slate-900 font-sans">
         <DataProvider>
           {children}
           <ServiceWorkerRegistrar />
