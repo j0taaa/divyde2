@@ -30,11 +30,23 @@ function persist(data: LocalData) {
 }
 
 export function useLocalData() {
-  const [data, setData] = useState<LocalData>(() => loadLocalData());
+  // Always start with initialData to avoid hydration mismatch
+  const [data, setData] = useState<LocalData>(initialData);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Load from localStorage only after hydration
+  useEffect(() => {
+    const loadedData = loadLocalData();
+    setData(loadedData);
+    setIsHydrated(true);
+  }, []);
 
   useEffect(() => {
-    persist(data);
-  }, [data]);
+    // Only persist after hydration to avoid unnecessary writes
+    if (isHydrated) {
+      persist(data);
+    }
+  }, [data, isHydrated]);
 
   const helpers = useMemo(() => ({
     addFriend: (name: string) => {
@@ -77,11 +89,13 @@ export function useLocalData() {
 
   const balances = useMemo(() => {
     const map = new Map<string, number>();
-    data.debts.forEach((debt) => {
-      const amount = debt.amount;
-      map.set(debt.creditorId, (map.get(debt.creditorId) || 0) + amount);
-      map.set(debt.debtorId, (map.get(debt.debtorId) || 0) - amount);
-    });
+    data.debts
+      .filter((debt) => !debt.isPaid)
+      .forEach((debt) => {
+        const amount = debt.amount;
+        map.set(debt.creditorId, (map.get(debt.creditorId) || 0) + amount);
+        map.set(debt.debtorId, (map.get(debt.debtorId) || 0) - amount);
+      });
     return map;
   }, [data.debts]);
 

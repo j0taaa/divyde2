@@ -9,38 +9,54 @@ function AddDebtForm() {
   const router = useRouter();
   const { data, addDebt } = useDataContext();
   const defaultFriend = search.get('friend');
-  const [friendId, setFriendId] = useState(defaultFriend || (data.friends[0]?.id ?? ''));
+  const [friendIds, setFriendIds] = useState<string[]>(
+    defaultFriend ? [defaultFriend] : []
+  );
   const [amount, setAmount] = useState('');
   const [direction, setDirection] = useState<'debtor' | 'creditor'>('debtor');
   const [name, setName] = useState('');
   const [divide, setDivide] = useState(false);
-  const [dividedAmong, setDividedAmong] = useState<string[]>([]);
+  const [includeSelf, setIncludeSelf] = useState(false);
 
   const friends = data.friends;
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
     const numericAmount = parseFloat(amount);
-    if (!friendId || isNaN(numericAmount)) return;
-    const targetId = friendId;
+    if (friendIds.length === 0 || isNaN(numericAmount)) return;
     const meId = 'me';
-    const creditorId = direction === 'creditor' ? meId : targetId;
-    const debtorId = direction === 'creditor' ? targetId : meId;
 
-    addDebt({
-      amount: numericAmount,
-      creditorId,
-      debtorId,
-      name: name.trim() || undefined,
-      isDivided: divide,
-      dividedAmong: divide ? dividedAmong : [],
+    // Calculate the amount per person if dividing
+    let amountPerPerson = numericAmount;
+    if (divide) {
+      const divisor = includeSelf ? friendIds.length + 1 : friendIds.length;
+      amountPerPerson = numericAmount / divisor;
+    }
+
+    friendIds.forEach((targetId) => {
+      const creditorId = direction === 'creditor' ? meId : targetId;
+      const debtorId = direction === 'creditor' ? targetId : meId;
+
+      addDebt({
+        amount: amountPerPerson,
+        creditorId,
+        debtorId,
+        name: name.trim() || undefined,
+        isDivided: divide,
+        dividedAmong: divide ? friendIds : [],
+      });
     });
 
-    router.push(`/friends/${targetId}`);
+    // Navigate to the first friend's page, or back to friends list if multiple selected
+    if (friendIds.length === 1) {
+      router.push(`/friends/${friendIds[0]}`);
+    } else {
+      router.push('/friends');
+    }
   };
 
-  const handleDivideSelection = (id: string) => {
-    setDividedAmong((current) =>
+  const handleFriendSelection = (id: string) => {
+    setFriendIds((current) =>
       current.includes(id) ? current.filter((x) => x !== id) : [...current, id]
     );
   };
@@ -95,21 +111,23 @@ function AddDebtForm() {
           </div>
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium">Friend</label>
-          <select
-            className="w-full rounded-md border border-slate-300 px-3 py-2"
-            value={friendId}
-            onChange={(e) => setFriendId(e.target.value)}
-          >
-            <option value="" disabled>
-              Select friend
-            </option>
+          <label className="text-sm font-medium">Friends</label>
+          <div className="space-y-2 rounded-md border border-slate-200 p-3">
             {friends.map((friend) => (
-              <option key={friend.id} value={friend.id}>
+              <label key={friend.id} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={friendIds.includes(friend.id)}
+                  onChange={() => handleFriendSelection(friend.id)}
+                  className="h-4 w-4"
+                />
                 {friend.name}
-              </option>
+              </label>
             ))}
-          </select>
+            {friendIds.length === 0 && (
+              <p className="text-xs text-slate-500">Select at least one friend</p>
+            )}
+          </div>
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium">Debt name (optional)</label>
@@ -121,9 +139,9 @@ function AddDebtForm() {
           />
         </div>
         {direction === 'creditor' && (
-          <div className="space-y-2 rounded-md border border-slate-200 p-3">
+          <div className="space-y-3 rounded-md border border-slate-200 p-3">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">Divide debt</label>
+              <label className="text-sm font-medium">Divide debt among friends</label>
               <input
                 type="checkbox"
                 checked={divide}
@@ -132,18 +150,27 @@ function AddDebtForm() {
               />
             </div>
             {divide && (
-              <div className="space-y-2">
-                {friends.map((friend) => (
-                  <label key={friend.id} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={dividedAmong.includes(friend.id)}
-                      onChange={() => handleDivideSelection(friend.id)}
-                    />
-                    {friend.name}
-                  </label>
-                ))}
-              </div>
+              <>
+                <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+                  <label className="text-sm text-slate-600">Include yourself in division</label>
+                  <input
+                    type="checkbox"
+                    checked={includeSelf}
+                    onChange={(e) => setIncludeSelf(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                </div>
+                {amount && friendIds.length > 0 && (
+                  <p className="text-xs text-slate-500 border-t border-slate-100 pt-3">
+                    {(() => {
+                      const total = parseFloat(amount);
+                      const divisor = includeSelf ? friendIds.length + 1 : friendIds.length;
+                      const perPerson = total / divisor;
+                      return `${total.toFixed(2)} ÷ ${divisor} = ${perPerson.toFixed(2)} per person`;
+                    })()}
+                  </p>
+                )}
+              </>
             )}
           </div>
         )}
@@ -157,9 +184,14 @@ function AddDebtForm() {
           </button>
           <button
             type="submit"
-            className="rounded-md bg-slate-900 px-4 py-2 text-white hover:bg-slate-800"
+            disabled={friendIds.length === 0}
+            className={`rounded-md px-4 py-2 text-white ${
+              friendIds.length === 0
+                ? 'bg-slate-400 cursor-not-allowed'
+                : 'bg-slate-900 hover:bg-slate-800'
+            }`}
           >
-            Save Debt
+            Save Debt{friendIds.length > 1 ? 's' : ''}
           </button>
         </div>
       </form>
