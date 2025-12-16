@@ -2,12 +2,12 @@
 
 import { FormEvent, Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useDataContext } from '@/components/data-context';
+import { useDataContext, DataProvider } from '@/components/data-context';
 
 function AddDebtForm() {
   const search = useSearchParams();
   const router = useRouter();
-  const { data, addDebt } = useDataContext();
+  const { data, addDebt, mode, isLoading } = useDataContext();
   const defaultFriend = search.get('friend');
   const [friendIds, setFriendIds] = useState<string[]>(
     defaultFriend ? [defaultFriend] : []
@@ -17,41 +17,56 @@ function AddDebtForm() {
   const [name, setName] = useState('');
   const [divide, setDivide] = useState(false);
   const [includeSelf, setIncludeSelf] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const friends = data.friends;
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const numericAmount = parseFloat(amount);
     if (friendIds.length === 0 || isNaN(numericAmount)) return;
+    
+    setIsSubmitting(true);
     const meId = 'me';
 
-    // Calculate the amount per person if dividing
-    let amountPerPerson = numericAmount;
-    if (divide) {
-      const divisor = includeSelf ? friendIds.length + 1 : friendIds.length;
-      amountPerPerson = numericAmount / divisor;
-    }
+    try {
+      // Calculate the amount per person if dividing
+      let amountPerPerson = numericAmount;
+      if (divide) {
+        const divisor = includeSelf ? friendIds.length + 1 : friendIds.length;
+        amountPerPerson = numericAmount / divisor;
+      }
 
-    friendIds.forEach((targetId) => {
-      const creditorId = direction === 'creditor' ? meId : targetId;
-      const debtorId = direction === 'creditor' ? targetId : meId;
+      for (const targetId of friendIds) {
+        const creditorId = direction === 'creditor' ? meId : targetId;
+        const debtorId = direction === 'creditor' ? targetId : meId;
 
-      addDebt({
-        amount: amountPerPerson,
-        creditorId,
-        debtorId,
-        name: name.trim() || undefined,
-        isDivided: divide,
-        dividedAmong: divide ? friendIds : [],
-      });
-    });
+        await addDebt({
+          amount: amountPerPerson,
+          creditorId,
+          debtorId,
+          name: name.trim() || undefined,
+          isDivided: divide,
+          dividedAmong: divide ? friendIds : [],
+        });
+      }
 
-    // Navigate to the first friend's page, or back to friends list if multiple selected
-    if (friendIds.length === 1) {
-      router.push(`/friends/${friendIds[0]}`);
-    } else {
-      router.push('/friends');
+      // Navigate to the first friend's page, or back to friends list if multiple selected
+      if (friendIds.length === 1) {
+        const friend = friends.find(f => f.id === friendIds[0]);
+        if (friend?.type === 'online') {
+          router.push(`/friends/online/${friendIds[0]}`);
+        } else {
+          router.push(`/friends/${friendIds[0]}`);
+        }
+      } else {
+        router.push(mode === 'online' ? '/friends/online' : '/friends');
+      }
+    } catch (err) {
+      console.error('Failed to add debt:', err);
+      alert('Failed to add debt. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -61,12 +76,26 @@ function AddDebtForm() {
     );
   };
 
+  if (isLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
+        <div className="rounded-lg bg-white px-4 py-3 text-slate-700 shadow animate-pulse">Loading...</div>
+      </main>
+    );
+  }
+
   if (friends.length === 0) {
     return (
       <main className="flex min-h-screen items-start justify-center bg-slate-50 px-4 py-10">
         <div className="w-full max-w-md space-y-4 rounded-lg bg-white p-6 shadow">
           <h1 className="text-2xl font-semibold">Add Debt</h1>
           <p className="text-slate-700">Add at least one friend before creating debts.</p>
+          <button
+            onClick={() => router.push(mode === 'online' ? '/friends/online' : '/friends')}
+            className="rounded-md bg-slate-900 px-4 py-2 text-white hover:bg-slate-800"
+          >
+            Go to Friends
+          </button>
         </div>
       </main>
     );
@@ -77,7 +106,9 @@ function AddDebtForm() {
       <form onSubmit={onSubmit} className="w-full max-w-md space-y-4 rounded-lg bg-white p-6 shadow">
         <div className="space-y-2 text-center">
           <h1 className="text-2xl font-semibold">Add Debt</h1>
-          <p className="text-sm text-slate-600">Single-column form focused on clarity.</p>
+          <p className="text-sm text-slate-600">
+            {mode === 'online' ? 'Synced with database' : 'Stored locally'}
+          </p>
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium">Amount</label>
@@ -89,6 +120,7 @@ function AddDebtForm() {
             className="w-full rounded-md border border-slate-300 px-3 py-2"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+            disabled={isSubmitting}
           />
         </div>
         <div className="space-y-2">
@@ -97,6 +129,7 @@ function AddDebtForm() {
             <button
               type="button"
               onClick={() => setDirection('debtor')}
+              disabled={isSubmitting}
               className={`flex-1 rounded-md border px-3 py-2 ${direction === 'debtor' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200'}`}
             >
               I owe them
@@ -104,6 +137,7 @@ function AddDebtForm() {
             <button
               type="button"
               onClick={() => setDirection('creditor')}
+              disabled={isSubmitting}
               className={`flex-1 rounded-md border px-3 py-2 ${direction === 'creditor' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200'}`}
             >
               They owe me
@@ -120,6 +154,7 @@ function AddDebtForm() {
                   checked={friendIds.includes(friend.id)}
                   onChange={() => handleFriendSelection(friend.id)}
                   className="h-4 w-4"
+                  disabled={isSubmitting}
                 />
                 {friend.name}
               </label>
@@ -136,6 +171,7 @@ function AddDebtForm() {
             placeholder="Dinner"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            disabled={isSubmitting}
           />
         </div>
         {direction === 'creditor' && (
@@ -147,6 +183,7 @@ function AddDebtForm() {
                 checked={divide}
                 onChange={(e) => setDivide(e.target.checked)}
                 className="h-4 w-4"
+                disabled={isSubmitting}
               />
             </div>
             {divide && (
@@ -158,6 +195,7 @@ function AddDebtForm() {
                     checked={includeSelf}
                     onChange={(e) => setIncludeSelf(e.target.checked)}
                     className="h-4 w-4"
+                    disabled={isSubmitting}
                   />
                 </div>
                 {amount && friendIds.length > 0 && (
@@ -179,19 +217,20 @@ function AddDebtForm() {
             type="button"
             onClick={() => router.back()}
             className="rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100"
+            disabled={isSubmitting}
           >
             Cancel
           </button>
           <button
             type="submit"
-            disabled={friendIds.length === 0}
+            disabled={friendIds.length === 0 || isSubmitting}
             className={`rounded-md px-4 py-2 text-white ${
-              friendIds.length === 0
+              friendIds.length === 0 || isSubmitting
                 ? 'bg-slate-400 cursor-not-allowed'
                 : 'bg-slate-900 hover:bg-slate-800'
             }`}
           >
-            Save Debt{friendIds.length > 1 ? 's' : ''}
+            {isSubmitting ? 'Saving...' : `Save Debt${friendIds.length > 1 ? 's' : ''}`}
           </button>
         </div>
       </form>
@@ -207,10 +246,21 @@ function LoadingForm() {
   );
 }
 
+function AddDebtWithProvider() {
+  const search = useSearchParams();
+  const mode = search.get('mode') === 'online' ? 'online' : 'local';
+  
+  return (
+    <DataProvider mode={mode}>
+      <AddDebtForm />
+    </DataProvider>
+  );
+}
+
 export default function AddDebtPage() {
   return (
     <Suspense fallback={<LoadingForm />}>
-      <AddDebtForm />
+      <AddDebtWithProvider />
     </Suspense>
   );
 }

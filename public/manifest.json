@@ -1,7 +1,7 @@
 {
   "name": "Debt Tracker",
   "short_name": "Debts",
-  "start_url": "/",
+  "start_url": "/debt/add",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0f172a",

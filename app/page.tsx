@@ -1,20 +1,10 @@
 import Link from 'next/link';
+import { isDatabaseAvailable } from '@/lib/db';
 
-async function getHealth() {
-  const base = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-  try {
-    const res = await fetch(`${base}/api/health`, {
-      cache: 'no-store',
-    });
-    const json = await res.json();
-    return json.database as boolean;
-  } catch {
-    return false;
-  }
-}
+export const dynamic = 'force-dynamic';
 
 export default async function Home() {
-  const databaseAvailable = await getHealth();
+  const databaseAvailable = await isDatabaseAvailable();
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-8 p-6 text-center">
       <div className="max-w-2xl space-y-4">

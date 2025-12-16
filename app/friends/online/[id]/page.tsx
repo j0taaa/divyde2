@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useDataContext } from '@/components/data-context';
 
-export default function FriendDetail() {
+export default function OnlineFriendDetail() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { data, debtsByFriend, markPaid, removeFriend, isLoading } = useDataContext();
@@ -16,7 +16,7 @@ export default function FriendDetail() {
     return (
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-10">
         <div className="rounded-md bg-slate-100 px-4 py-3 text-slate-700 animate-pulse">
-          Loading...
+          Loading friend details...
         </div>
       </main>
     );
@@ -26,8 +26,8 @@ export default function FriendDetail() {
     return (
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-10">
         <div className="rounded-md bg-red-100 px-4 py-3 text-red-800">Friend not found.</div>
-        <Link href="/friends" className="text-slate-700 underline">
-          Back to list
+        <Link href="/friends/online" className="text-slate-700 underline">
+          Back to online friends
         </Link>
       </main>
     );
@@ -38,7 +38,7 @@ export default function FriendDetail() {
     if (confirmed) {
       try {
         await removeFriend(friend.id);
-        router.push('/friends');
+        router.push('/friends/online');
       } catch (err) {
         console.error('Failed to remove friend:', err);
         alert('Failed to remove friend');
@@ -60,9 +60,12 @@ export default function FriendDetail() {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-slate-600">
-            <Link href="/friends" className="hover:underline">Friends</Link> / Detail
+            <Link href="/friends/online" className="hover:underline">Online Friends</Link> / Detail
           </p>
           <h1 className="text-3xl font-semibold">{friend.name}</h1>
+          {friend.email && (
+            <p className="text-sm text-slate-500">{friend.email}</p>
+          )}
         </div>
         <button
           className="rounded-md border border-red-200 px-3 py-2 text-red-700 hover:bg-red-50"
@@ -76,7 +79,7 @@ export default function FriendDetail() {
       </div>
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Debt history</h2>
-        <Link href={`/debt/add?friend=${friend.id}`} className="rounded-md bg-slate-900 px-3 py-2 text-white hover:bg-slate-800">
+        <Link href={`/debt/add?friend=${friend.id}&mode=online`} className="rounded-md bg-slate-900 px-3 py-2 text-white hover:bg-slate-800">
           Add Another Debt
         </Link>
       </div>
